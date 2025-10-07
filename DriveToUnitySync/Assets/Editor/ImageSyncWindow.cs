@@ -140,7 +140,7 @@ public class ImageSyncWindow : EditorWindow
                 
                 //Header 
                 EditorGUILayout.BeginHorizontal("box");
-                GUILayout.Label("Asset Name", EditorStyles.boldLabel, GUILayout.Width(200));
+                GUILayout.Label("Asset Name", EditorStyles.boldLabel, GUILayout.Width(300));
                 GUILayout.Label("Path", EditorStyles.boldLabel, GUILayout.Width(150));
                 GUILayout.Label("Download Link", EditorStyles.boldLabel);
                 EditorGUILayout.EndHorizontal();
@@ -257,7 +257,6 @@ public class ImageSyncWindow : EditorWindow
             GUILayout.Label("Loading preview...", EditorStyles.centeredGreyMiniLabel);
     }
     
-    // Replace your PopulateAssets() method with this:
     private void PopulateAssets()
     {
         if (GUILayout.Button("Populate Assets"))
@@ -268,6 +267,8 @@ public class ImageSyncWindow : EditorWindow
                 return;
             }
         
+            // Note: Edge case: you assign a Target CSV that is totally empty and try to open the "Preview CSV" menu. It will throw 
+            // an error :')))
             try
             {
                 string csvText = AssetDatabase.LoadAssetAtPath<TextAsset>(targetCsvPath).text;

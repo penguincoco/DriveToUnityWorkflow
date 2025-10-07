@@ -17,7 +17,7 @@ function doGet(e) {
 }
 
 function populate() {
-  var files = getAllPngsInFolder("1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7"); // REPLACE THIS WITH YOUR OWN ROOT FOLDER ID
+  var files = getAllPngsInFolder("1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7"); //TODO: REPLACE THIS WITH YOUR OWN ROOT FOLDER ID
 
   // Sort by folder path, then by filename
   files.sort(function(a, b) {
