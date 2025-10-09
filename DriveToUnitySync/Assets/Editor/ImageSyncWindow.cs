@@ -10,42 +10,47 @@ using System;
 using System.Linq;
 using UnityEngine.Serialization;
 
+/*
+ * This script is for the Image Sync Editor Window. It syncs Images and other media from a Folder in Drive to Unity.
+ *
+ * Major coding logic flow: 
+ * Logic flow: SyncSheet() runs the Apps Script which reads the folders in Drive and populates a Google Spreadsheet. When Apps Script is completed, it calls SyncWithGoogleSheets() to sync the
+ * Unity-side .csv with the Google Sheet
+ */
+
 public class ImageSyncWindow : EditorWindow
 {
     private SerializedObject so;
-    [SerializeField] private string appsScriptURL = "";
     
+    //URLS/needs for Apps Script
+    [SerializeField] private string appsScriptURL = "";
     [SerializeField] private string sourceCSV =
         "https://docs.google.com/spreadsheets/d/e/2PACX-1vTyF96_q1B9ELrj8sFhfKB6hOuCM8EAS5zrBY7oWQrkPsSnrDMT2RH83jJrbFA1YKMVi1l18kIauX6P/pub?gid=0&single=true&output=csv";
-
     private string targetCsvPath = "";
-    [SerializeField]private TextAsset targetCSV;
+    [SerializeField] private TextAsset targetCSV;
 
+    //status messages
     private string statusMessage = "";
     private string populateStatusMessage = "";
 
     private Vector2 scrollPos;
     
-    //image preview
+    //Preview: downloading/populating assets 
     private Texture2D currentTexturePreview;
     private string currentNamePreview = "";
     private int totalAssets = 0;
     private int currentAssetIndex = 0;
     private Vector2 scollPosition;
     
-    //CSV preview
+    //Preview: CSV contents 
     private Vector2 csvScrollPosition;
     private bool showCsvPreview = false;
-    
-    //temp testing!
     List<Line_Asset> csvLines = new List<Line_Asset>();
+    private Dictionary<string, float> downloadProgress = new Dictionary<string, float>();
+    private HashSet<string> currentlyDownloading = new HashSet<string>();
     
     [MenuItem("Tools/Drive Image Sync")]
-    public static void ShowWindow()
-    {
-        GetWindow<ImageSyncWindow>("Drive Image Sync");
-    }
-    
+    public static void ShowWindow() => GetWindow<ImageSyncWindow>("Drive Image Sync");
     private void OnEnable() => so = new SerializedObject(this);
 
     void OnGUI()
@@ -82,9 +87,7 @@ public class ImageSyncWindow : EditorWindow
         EditorGUILayout.EndScrollView();
     }
     
-    /*
-     * Logic flow: Sync Sheet runs the Apps Script, when Apps Script is completed, it calls SyncWithGoogleSheets()
-     */
+    // ---------- MAIN FLOW FUNCTIONS ----------
     private void SyncSheet()
     {
         if (!string.IsNullOrEmpty(appsScriptURL) && !string.IsNullOrEmpty(sourceCSV) && !string.IsNullOrEmpty(targetCsvPath))
@@ -100,24 +103,92 @@ public class ImageSyncWindow : EditorWindow
     private void RunAppsScriptWrapper() => EditorCoroutineUtility.StartCoroutineOwnerless(RunAppsScript(appsScriptURL, msg => statusMessage = msg));
     private void SyncWithGoogleSheets() => EditorCoroutineUtility.StartCoroutineOwnerless(DownloadCSV(targetCsvPath, sourceCSV,
             msg => statusMessage = msg));
-        
-    private void SelectParentFolder()
+    
+    private void PopulateAssets()
     {
-        if (GUILayout.Button("Select Parent Asset Folder"))
+        if (GUILayout.Button("Populate Assets"))
         {
-            string folder = EditorUtility.OpenFolderPanel("Parent Folder", "Assets", "");
-            if (!string.IsNullOrEmpty(folder))
+            if (targetCSV == null || string.IsNullOrEmpty(targetCsvPath))
             {
-                string projectPath = Application.dataPath; // e.g., /Users/Sammy/ProjectName/Assets
-                if (folder.StartsWith(projectPath))
-                    folder = "Assets" + folder.Substring(projectPath.Length);
-                //assetsParentFolder = folder;
+                Debug.LogError("No target CSV assigned.");
+                return;
+            }
+        
+            // This try-catch handles an edge case--you assign a Target CSV that is totally empty and try to open the "Preview CSV" menu. It will throw 
+            // an error :')))
+            try
+            {
+                string csvText = AssetDatabase.LoadAssetAtPath<TextAsset>(targetCsvPath).text;
+            
+                if (string.IsNullOrEmpty(csvText))
+                {
+                    Debug.LogError("CSV file is empty.");
+                    return;
+                }
+            
+                string[] parsedArray = ParserUtilities.ParseCSVText(csvText);
+            
+                if (parsedArray == null || parsedArray.Length == 0)
+                {
+                    Debug.LogError("CSV contains no valid data.");
+                    return;
+                }
+            
+                EvaluateEntries(parsedArray);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Error populating assets: {e.Message}");
             }
         }
-        
-        //GUILayout.Label("Parent Folder: " + assetsParentFolder);
     }
 
+    private void EvaluateEntries(string[] parsedArray)
+    {
+        List<Line_Asset> lines = ParserUtilities.ParseLines(
+            parsedArray,
+            minParts: 3,
+            maxParts: 3,
+            factory: parts => new Line_Asset(parts[0], parts[1], parts[2])
+        );
+
+        this.csvLines = lines;
+
+        currentAssetIndex = 0;
+        totalAssets = lines.Count;
+        currentTexturePreview = null;
+        currentNamePreview = "";
+        
+        EditorCoroutineUtility.StartCoroutineOwnerless(DownloadAllAssets(lines));
+    }
+
+    private IEnumerator RunAppsScript(string url, Action<string> onStatusUpdate)
+    {
+        Debug.Log("Running Apps Script");
+        onStatusUpdate("Running Apps Script...");
+        //Debug.Log("EXACT URL BEING CALLED: " + url);
+        
+        using (UnityWebRequest appsScriptRequest = UnityWebRequest.Get(url))
+        {
+            appsScriptRequest.timeout = 60;
+        
+            yield return appsScriptRequest.SendWebRequest();
+
+            Debug.Log($"Response Code: {appsScriptRequest.responseCode}");
+            //Debug.Log($"Full Response: {appsScriptRequest.downloadHandler.text}");
+
+            if (appsScriptRequest.result != UnityWebRequest.Result.Success)
+                Debug.LogError($"Failed to run Apps Script: {appsScriptRequest.error}");
+            else
+            {
+                //Debug.Log("Apps Script successfully run!");
+                onStatusUpdate("Apps Script successfully run!");
+                SyncWithGoogleSheets();
+            }
+        }
+    }
+    
+    // ---------- EDITOR PREVIEW FUNCTIONS ----------
     private void DrawCSVPreviewSection()
     {
         GUILayout.Label("CSV Preview", EditorStyles.boldLabel);
@@ -125,7 +196,6 @@ public class ImageSyncWindow : EditorWindow
         if (string.IsNullOrEmpty(targetCsvPath) && csvLines.Count > 0)
             csvLines.Clear();
         
-        //collapsible menu thingy for showing the csv preview
         showCsvPreview = EditorGUILayout.Foldout(showCsvPreview,  $"Show CSV Contents ({csvLines.Count} assets)", true);
 
         if (showCsvPreview)
@@ -138,80 +208,63 @@ public class ImageSyncWindow : EditorWindow
                 EditorGUILayout.HelpBox($"TotalAssets: {csvLines.Count}", MessageType.Info);
                 csvScrollPosition = EditorGUILayout.BeginScrollView(csvScrollPosition, GUILayout.Height(300));
                 
-                //Header 
+                //visual header
                 EditorGUILayout.BeginHorizontal("box");
-                GUILayout.Label("Asset Name", EditorStyles.boldLabel, GUILayout.Width(300));
+                GUILayout.Label("Asset Name", EditorStyles.boldLabel, GUILayout.Width(200));
                 GUILayout.Label("Path", EditorStyles.boldLabel, GUILayout.Width(150));
-                GUILayout.Label("Download Link", EditorStyles.boldLabel);
+                GUILayout.Label("Download Link", EditorStyles.boldLabel, GUILayout.Width(150));
+                GUILayout.Label("Redownload Asset", EditorStyles.boldLabel, GUILayout.Width(150));
+                
                 EditorGUILayout.EndHorizontal();
 
                 foreach (Line_Asset line in csvLines)
                 {
                     EditorGUILayout.BeginHorizontal("box");
 
-                    GUILayout.Label(line.assetName, GUILayout.Width(300));
+                    GUILayout.Label(line.assetName, GUILayout.Width(200));
                     GUILayout.Label(line.assetPath, GUILayout.Width(150));
                     
                     if (GUILayout.Button("Copy Link", GUILayout.Width(80)))
                         EditorGUIUtility.systemCopyBuffer = line.assetDownloadLink;
-                        //Debug.Log($"Copied link for: {line.assetName}");;
+                    
+                    GUILayout.Space(70);
+                    // ---------- Showing progress bar when redownloading an asset ----------
+                    if (currentlyDownloading.Contains(line.assetName))
+                    {
+                        float progress = downloadProgress.ContainsKey(line.assetName) 
+                            ? downloadProgress[line.assetName] 
+                            : 0f;
+                        EditorGUI.ProgressBar(
+                            EditorGUILayout.GetControlRect(false, 20, GUILayout.Width(100)), 
+                            progress, 
+                            $"{(progress * 100):F0}%"
+                        );
+                    }
+                    else
+                    {
+                        if (GUILayout.Button("Redownload", GUILayout.Width(100)))
+                        {
+                            EditorCoroutineUtility.StartCoroutineOwnerless(
+                                DownloadAndSave(
+                                    line.assetName,
+                                    line.assetDownloadLink,
+                                    "Assets/Art" + line.assetPath,
+                                    msg => { }, // Empty status update since we're showing progress bar
+                                    trackProgress: true // Enable progress tracking!
+                                )
+                            );
+                        }
+                    }
                     
                     EditorGUILayout.EndHorizontal();
                 }
-                
-                EditorGUILayout.EndScrollView(); // MOVED INSIDE THE if (csvLines.Count > 0) BLOCK
+                EditorGUILayout.EndScrollView();
             }
             else
                 EditorGUILayout.HelpBox("No CSV data loaded. Run Apps Script and sync first.", MessageType.Warning);
 
-            //the csv preview doesn't update automatically, press this button to refresh it 
             if (GUILayout.Button("Refresh CSV Preview"))
                 LoadCSVData();
-        }
-    }
-
-    private void LoadCSVData()
-    {
-        if (!File.Exists(targetCsvPath) || string.IsNullOrEmpty(targetCsvPath))
-        {
-            csvLines.Clear();
-            Debug.LogWarning("CSV file not found or path is empty.");
-            return;
-        }
-    
-        try
-        {
-            TextAsset csvAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(targetCsvPath);
-        
-            if (csvAsset == null || string.IsNullOrEmpty(csvAsset.text))
-            {
-                csvLines.Clear();
-                Debug.LogWarning("CSV file is empty or could not be loaded.");
-                return;
-            }
-        
-            string[] parsedArray = ParserUtilities.ParseCSVText(csvAsset.text);
-        
-            if (parsedArray == null || parsedArray.Length == 0)
-            {
-                csvLines.Clear();
-                Debug.LogWarning("CSV file contains no data.");
-                return;
-            }
-        
-            csvLines = ParserUtilities.ParseLines(
-                parsedArray,
-                minParts: 3,
-                maxParts: 3,
-                factory: parts => new Line_Asset(parts[0], parts[1], parts[2])
-            );
-        
-            Repaint();
-        }
-        catch (Exception e)
-        {
-            csvLines.Clear();
-            Debug.LogError($"Error loading CSV data: {e.Message}");
         }
     }
     
@@ -256,131 +309,55 @@ public class ImageSyncWindow : EditorWindow
         else if (totalAssets > 0)
             GUILayout.Label("Loading preview...", EditorStyles.centeredGreyMiniLabel);
     }
-    
-    private void PopulateAssets()
+
+    private void LoadCSVData()
     {
-        if (GUILayout.Button("Populate Assets"))
+        if (!File.Exists(targetCsvPath) || string.IsNullOrEmpty(targetCsvPath))
         {
-            if (targetCSV == null || string.IsNullOrEmpty(targetCsvPath))
+            csvLines.Clear();
+            Debug.LogWarning("CSV file not found or path is empty.");
+            return;
+        }
+    
+        try
+        {
+            TextAsset csvAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(targetCsvPath);
+        
+            if (csvAsset == null || string.IsNullOrEmpty(csvAsset.text))
             {
-                Debug.LogError("No target CSV assigned.");
+                csvLines.Clear();
+                Debug.LogWarning("CSV file is empty or could not be loaded.");
                 return;
             }
         
-            // Note: Edge case: you assign a Target CSV that is totally empty and try to open the "Preview CSV" menu. It will throw 
-            // an error :')))
-            try
+            string[] parsedArray = ParserUtilities.ParseCSVText(csvAsset.text);
+        
+            if (parsedArray == null || parsedArray.Length == 0)
             {
-                string csvText = AssetDatabase.LoadAssetAtPath<TextAsset>(targetCsvPath).text;
-            
-                if (string.IsNullOrEmpty(csvText))
-                {
-                    Debug.LogError("CSV file is empty.");
-                    return;
-                }
-            
-                string[] parsedArray = ParserUtilities.ParseCSVText(csvText);
-            
-                if (parsedArray == null || parsedArray.Length == 0)
-                {
-                    Debug.LogError("CSV contains no valid data.");
-                    return;
-                }
-            
-                EvaluateEntries(parsedArray);
+                csvLines.Clear();
+                Debug.LogWarning("CSV file contains no data.");
+                return;
             }
-            catch (Exception e)
-            {
-                Debug.LogError($"Error populating assets: {e.Message}");
-            }
+        
+            csvLines = ParserUtilities.ParseLines(
+                parsedArray,
+                minParts: 3,
+                maxParts: 3,
+                factory: parts => new Line_Asset(parts[0], parts[1], parts[2])
+            );
+        
+            Repaint();
         }
-    }
-
-    private void EvaluateEntries(string[] parsedArray)
-    {
-        List<Line_Asset> lines = ParserUtilities.ParseLines(
-            parsedArray,
-            minParts: 3,
-            maxParts: 3,
-            factory: parts => new Line_Asset(parts[0], parts[1], parts[2])
-        );
-
-        this.csvLines = lines;
-        Debug.Log(csvLines.Count);
-
-        currentAssetIndex = 0;
-        totalAssets = lines.Count;
-        currentTexturePreview = null;
-        currentNamePreview = "";
-        
-        EditorCoroutineUtility.StartCoroutineOwnerless(DownloadAllAssets(lines));
-    }
-
-    private IEnumerator WaitForSeconds(Action<string> setter, string textToSet, float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        setter(textToSet);
-    }
-
-    private IEnumerator RunAppsScript(string url, Action<string> onStatusUpdate)
-    {
-        Debug.Log("Running Apps Script");
-        onStatusUpdate("Running Apps Script...");
-        //Debug.Log("EXACT URL BEING CALLED: " + url);
-        
-        using (UnityWebRequest appsScriptRequest = UnityWebRequest.Get(url))
+        catch (Exception e)
         {
-            appsScriptRequest.timeout = 60;
-        
-            yield return appsScriptRequest.SendWebRequest();
-
-            Debug.Log($"Response Code: {appsScriptRequest.responseCode}");
-            //Debug.Log($"Full Response: {appsScriptRequest.downloadHandler.text}");
-
-            if (appsScriptRequest.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError($"Failed to run Apps Script: {appsScriptRequest.error}");
-            }
-            else
-            {
-                //Debug.Log("Apps Script successfully run!");
-                onStatusUpdate("Apps Script successfully run!");
-                SyncWithGoogleSheets();
-            }
+            csvLines.Clear();
+            // Debug.LogError($"Error loading CSV data: {e.Message}");
         }
     }
 
-    private IEnumerator DownloadCSV(string savePath, string path, Action<string> onStatusUpdate)
-    {
-        //Debug.Log("Downloading CSV");
-        //lowkey this onStatusUpdate is getting eaten up because the sync itself is pretty fast but that's fine lol
-        onStatusUpdate("syncing...");
-        
-        using (UnityWebRequest www = UnityWebRequest.Get(path))
-        {
-            yield return www.SendWebRequest();
-
-            if (www.result != UnityWebRequest.Result.Success)
-            {
-                onStatusUpdate("Failed to fetch sheet: " + www.error);
-            }
-            else
-            {
-                File.WriteAllText(savePath, www.downloadHandler.text);
-                //Debug.Log("Synced successfully");
-                onStatusUpdate("Synced successfully!");
-                Repaint();
-                AssetDatabase.Refresh();
-                LoadCSVData();
-                EditorCoroutineUtility.StartCoroutineOwnerless(WaitForSeconds(
-                    newValue => statusMessage = newValue,
-                    "Ready to Sync",
-                    3f
-                ));
-            }
-        }
-    }
-
+    /*zHelper function: This downloads all assets from the CSV, there's an individual DownloadAndSave function that actually
+    * does the download for each asset
+    */
     private IEnumerator DownloadAllAssets(List<Line_Asset> lines)
     {
         populateStatusMessage = "Populating...";
@@ -421,6 +398,7 @@ public class ImageSyncWindow : EditorWindow
     private IEnumerator CleanUpDeletedAssets(List<Line_Asset> lines)
     {
         HashSet<string> expectedAssets = new HashSet<string>(lines.Select(line => line.assetName));
+        //TODO: Make this folder assignable via the Window, it's hardcoded right now! :D 
         string[] actualAssetPaths = AssetUtilities.GetAllAssetPathsInFolder("Assets/Art");
         actualAssetPaths = actualAssetPaths.Take(actualAssetPaths.Length - 1).ToArray();
 
@@ -430,6 +408,7 @@ public class ImageSyncWindow : EditorWindow
 
             if (!expectedAssets.Contains(fileName))
             {
+                currentNamePreview = $"Deleting orphaned asset: {fileName}";
                 Debug.Log($"Deleting orphaned asset: {fileName}");
                 AssetDatabase.DeleteAsset(assetPath);
                 yield return null;
@@ -438,55 +417,119 @@ public class ImageSyncWindow : EditorWindow
 
         AssetDatabase.Refresh();
     }
-    
-    private IEnumerator DownloadAndSave(string fileName, string sourcePath, string destinationPath, Action<string> onStatusUpdate)
+ 
+    //Downloading the CSV (path is the download link) 
+    private IEnumerator DownloadCSV(string savePath, string path, Action<string> onStatusUpdate)
     {
+        //Debug.Log("Downloading CSV");
+        //lowkey this onStatusUpdate is getting eaten up because the sync itself is pretty fast but that's fine lol
+        onStatusUpdate("syncing...");
+        
+        using (UnityWebRequest www = UnityWebRequest.Get(path))
+        {
+            yield return www.SendWebRequest();
+
+            if (www.result != UnityWebRequest.Result.Success)
+                onStatusUpdate("Failed to fetch sheet: " + www.error);
+            else
+            {
+                File.WriteAllText(savePath, www.downloadHandler.text);
+                //Debug.Log("Synced successfully");
+                onStatusUpdate("Synced successfully!");
+                Repaint();
+                AssetDatabase.Refresh();
+                LoadCSVData();
+                EditorCoroutineUtility.StartCoroutineOwnerless(WaitForSeconds(
+                    newValue => statusMessage = newValue,
+                    "Ready to Sync",
+                    3f
+                ));
+            }
+        }
+    }
+    
+    //Downloading assets
+    private IEnumerator DownloadAndSave(string fileName, string sourcePath, string destinationPath, Action<string> onStatusUpdate, bool trackProgress = false)
+    {
+        // ---------- for redownloading individual assets, show the progress bar as it redownloads ----------
+        if (trackProgress)
+        {
+            currentlyDownloading.Add(fileName);
+            downloadProgress[fileName] = 0f;
+        }
+        // ---------- end ----------
+    
         onStatusUpdate($"Downloading {fileName}...");
 
         string extension = Path.GetExtension(fileName).ToLower();
         bool isImage = extension == ".png" || extension == ".jpg" || extension == ".jpeg";
 
         UnityWebRequest uwr;
-
-        if (isImage == true)
+        if (isImage)
             uwr = UnityWebRequestTexture.GetTexture(sourcePath);
         else
             uwr = UnityWebRequest.Get(sourcePath);
-        
+    
         using (uwr)
         {
-            yield return uwr.SendWebRequest();
+            UnityWebRequestAsyncOperation operation = uwr.SendWebRequest();
+        
+            // ---------- for redownloading individual assets, show the progress bar as it redownloads ----------
+            if (trackProgress)
+            {
+                while (!operation.isDone)
+                {
+                    downloadProgress[fileName] = uwr.downloadProgress;
+                    Repaint();
+                    yield return null;
+                }
+                downloadProgress[fileName] = 1f;
+                Repaint();
+            }
+            else
+                yield return operation;
+            // ---------- end ----------
 
             if (uwr.result != UnityWebRequest.Result.Success)
                 Debug.LogError("Failed to download: " + uwr.error);
             else
             {
-                //check if the directory already exists, if not, create one
                 if (!Directory.Exists(destinationPath))
                     Directory.CreateDirectory(destinationPath);
-                
+            
                 string savePath = Path.Combine(destinationPath, fileName);
 
-                if (isImage == true)
+                if (isImage)
                     DownloadImage(savePath, uwr);
                 else
                     DownloadAsset(savePath, uwr);
             }
         }
+    
+        // ---------- for redownloading individual assets, show the progress bar as it redownloads ----------
+        if (trackProgress)
+        {
+            yield return new WaitForSeconds(0.5f);
+            currentlyDownloading.Remove(fileName);
+            downloadProgress.Remove(fileName);
+            Repaint();
+        }
+        // ---------- end ----------
     }
 
+    // ---------- ASSET DOWNLOAD HELPER FUNCTIONS ----------
     //for downloading Images (.png, .jpeg, .jpg) 
     private void DownloadImage(string savePath, UnityWebRequest uwr)
     {
         Texture2D texture = DownloadHandlerTexture.GetContent(uwr);
         byte[] pngData = texture.EncodeToPNG();
-                    
+
         File.WriteAllBytes(savePath, pngData); //update if an asset already exists
-                    
+
         AssetDatabase.Refresh();
         AssetDatabase.ImportAsset(savePath, ImportAssetOptions.ForceUpdate);
 
-        //wait for the import to complete, could throw errors if you basically aren't done with the import and try to set the mode
+        //wait for the import to complete, could throw errors if you aren't done with the import and try to set the mode
         EditorApplication.delayCall += () =>
         {
             //set imported asset to a sprite
@@ -516,6 +559,37 @@ public class ImageSyncWindow : EditorWindow
 
         AssetDatabase.Refresh();
         AssetDatabase.ImportAsset(savePath, ImportAssetOptions.ForceUpdate);
+    }
+    
+    // ---------- HELPER FUNCTIONS ----------
+    private IEnumerator WaitForSeconds(Action<string> setter, string textToSet, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        setter(textToSet);
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    // ---------- Archived functions ----------
+    private void SelectParentFolder()
+    {
+        if (GUILayout.Button("Select Parent Asset Folder"))
+        {
+            string folder = EditorUtility.OpenFolderPanel("Parent Folder", "Assets", "");
+            if (!string.IsNullOrEmpty(folder))
+            {
+                string projectPath = Application.dataPath; // e.g., /Users/username/ProjectName/Assets
+                if (folder.StartsWith(projectPath))
+                    folder = "Assets" + folder.Substring(projectPath.Length);
+                //assetsParentFolder = folder;
+            }
+        }
+        //GUILayout.Label("Parent Folder: " + assetsParentFolder);
     }
 }
 
