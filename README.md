@@ -152,6 +152,8 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
     
     a. Download all .pngs from their downloadable links. The Unity folder structure will mirror the Drive structure under /Assets/Art/__2D. If an asset already exists, it will overwrite the data. If an asset does not already exist, it will create it to the correct folder. (If a folder doesn’t exist, it will also generate the folder)
 
+## Best Practices 
+
 
 ## Demo Setup
 There is an example setup attached with this repo. 
@@ -216,3 +218,14 @@ There is an example setup attached with this repo.
 1. If an asset was updated in Drive, you do not need to sync the .csv again. This is because the asset download path is the same (if the asset was replaced as mentioned above). But, for best practice just, never hurts to Sync again :’) 
 
 ## Next Features
+1. Ability to change Sprite Import settings via the editor window (right now they all download as a Sprite, alpha is transparency, Single Sprite mode.
+<p align="center">
+  <img width="509" height="429" alt="image" src="https://github.com/user-attachments/assets/ffd4c044-5f74-4f66-8bc6-e49fb2c5e7f5" />
+</p>
+
+2. Ability to stop the download/populate
+
+
+## Code Diagram
+<img width="4800" height="2048" alt="DriveToUnityWorkflow" src="https://github.com/user-attachments/assets/5036be9a-1eee-46b4-8b76-f363bf1e1000" />
+
