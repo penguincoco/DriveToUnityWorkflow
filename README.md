@@ -7,6 +7,12 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
 > You must be connected to the Internet for this workflow to work! 
 
 ## Initial Setup 
+
+> <details>
+>  <summary>▶️ Watch demo</summary>
+>  <video src="https://github.com/user-attachments/assets/f42f311d-7dd5-4809-8642-bad455d0f504" controls width="600"></video>
+> </details>
+
 1. In Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />, open Drive Image Sync under Tools > Drive Image Sync.
   <p align="center">
     <img width="656" height="332" alt="image" src="https://github.com/user-attachments/assets/15d82b45-141c-4252-8a56-ae612af7f114" />
