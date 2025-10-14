@@ -24,8 +24,7 @@ public class ImageSyncWindow : EditorWindow
     
     //URLS/needs for Apps Script
     [SerializeField] private string appsScriptURL = "";
-    [SerializeField] private string sourceCSV =
-        "https://docs.google.com/spreadsheets/d/e/2PACX-1vTyF96_q1B9ELrj8sFhfKB6hOuCM8EAS5zrBY7oWQrkPsSnrDMT2RH83jJrbFA1YKMVi1l18kIauX6P/pub?gid=0&single=true&output=csv";
+    [SerializeField] private string sourceCSV = "";
     private string targetCsvPath = "";
     [SerializeField] private TextAsset targetCSV;
 
