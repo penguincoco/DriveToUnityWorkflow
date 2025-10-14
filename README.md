@@ -32,7 +32,7 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
 > ```
 
 3. Create a spreadsheet in Google Drive <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/051a0bf6-9ecd-45cc-a6fc-4936b69114a8" />
- and create an Apps Script <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/a7401c1b-2667-486c-96f1-dad11738b480" /> by clicking Extensions > Apps Script. This will open the Apps Script IDE in a new tab. (no text needs to be input on the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/7738f9c1-cf00-4988-8328-2cacd7f753ca" />, the running the Apps Script will take care of that!)
+ and create an Apps Script <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/a7401c1b-2667-486c-96f1-dad11738b480" /> by clicking Extensions > Apps Script. This will open the Apps Script IDE in a new tab. (**no text needs to be input on the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/7738f9c1-cf00-4988-8328-2cacd7f753ca" />, the running the Apps Script <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/a7401c1b-2667-486c-96f1-dad11738b480" /> will take care of that!**)
 
 4. In Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />, navigate to a file called `AssetSync.gs` (Path: `/Assets/AppsScript/AssetSync.gs`). Copy and paste the contents of this script into the Apps Script <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/a7401c1b-2667-486c-96f1-dad11738b480" /> and save. 
    
@@ -41,7 +41,7 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
 >
 > ### How this Code works
 >
-> Starting from the root folder (which you will need to copy and paste into files (this line is commented with a `REPLACE THIS WITH YOUR OWN ROOT FOLDER ID`)), it will check every sub folder and grab all assets of type: `png`, `jpg`, `jpeg`, `psd`, `pdf`, `fbx`, `obj` (technically, it can download any asset of any type, but these are the ones you should generally be uploading, as this is a tool for syncing art assets!). It will then turn each of those assets into a downloadble link and populate that link, along with the asset path, to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />.
+> Starting from the root folder (which you will need to copy and paste into files (this line is commented with a `TODO: REPLACE THIS WITH YOUR OWN ROOT FOLDER ID`)), it will check every sub folder and grab all assets of type: `png`, `jpg`, `jpeg`, `psd`, `pdf`, `fbx`, `obj` (technically, it can download any asset of any type, but these are the ones you should generally be uploading, as this is a tool for syncing art assets!). It will then turn each of those assets into a downloadble link and populate that link, along with the asset path, to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />.
 >
 > ```
 > // doGet is how Unity can trigger running this script!
@@ -136,9 +136,14 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
 >
 > </details>
 
-5. At the top right, click Deploy > New Deployment (Web App) and set the access to "Anyone". Copy that link and paste it into "Apps Script Link". 
+5. Running the Apps Script <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/a7401c1b-2667-486c-96f1-dad11738b480" /> for the first time will require giving permissions manually. Click "Run" at the top. This will open a permissions window. Select all (as this will allow the Apps Script <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/a7401c1b-2667-486c-96f1-dad11738b480" /> to access your Drive and write to the sheet).
+<p align="center">
+  <img width="790" height="475" alt="image" src="https://github.com/user-attachments/assets/6a886cb0-4188-4160-b8f8-c2c96b26bdbb" /> <img width="476" height="235" alt="image" src="https://github.com/user-attachments/assets/bc7fad4b-81e2-4d63-b76b-5fec5c834fec" />
+</p>
 
-6. Go back to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" /> File > Share > Publish. Copy that link and paste it into "Read from Link" 
+6. At the top right, click Deploy > New Deployment (Web App) and set the access to "Anyone". Copy that link and paste it into "Apps Script Link". 
+
+7. Go back to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" /> File > Share > Publish. Copy that link and paste it into "Read from Link" 
 <p align="center">
   <img width="528" height="468" alt="image" src="https://github.com/user-attachments/assets/2820b4e2-4b05-4efa-b179-f3f7cd21a9df" />
 </p>
@@ -231,7 +236,13 @@ There is an example setup attached with this repo.
 
 2. Ability to stop the download/populate
 
+### FAQ 
+**Common Errors When Running the Tool**
+
+| Error Code  | Console Output | Debugging Steps |
+| ------------- | ------------- | ------------- |
+| 0  | Cannot resolve destination host | Not connected to the Internet. Connect to the Internet! 
+| 403  | HTTP/1.1 403 Forbidden  | Apps Script does not have the correct permissions (see Step #5 in [Initial Setup](#initial-setup) for steps |
 
 ## Code Diagram
 <img width="4800" height="2048" alt="DriveToUnityWorkflow" src="https://github.com/user-attachments/assets/5036be9a-1eee-46b4-8b76-f363bf1e1000" />
-
