@@ -15,7 +15,7 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
 
 1. In Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />, open Drive Image Sync under Tools > Drive Image Sync.
   <p align="center">
-    <img width="656" height="332" alt="image" src="https://github.com/user-attachments/assets/15d82b45-141c-4252-8a56-ae612af7f114" />
+    <img width="729" height="386" alt="image" src="https://github.com/user-attachments/assets/5562c217-c0c4-4ca6-a3de-c124acdd6984" />
   </p>
 
 2. In Google Drive <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/051a0bf6-9ecd-45cc-a6fc-4936b69114a8" />, create a parent folder that you want. Title it whatever you need, having an "Art" parent folder and "2D" and "3D" subfolders is recommended. Upload your assets to their appropriate folders. See example Drive setup [here](<https://drive.google.com/drive/folders/1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7?usp=drive_link>).
@@ -151,6 +151,13 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
 </p>
 
 6. Copy and paste your root Google Drive <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/051a0bf6-9ecd-45cc-a6fc-4936b69114a8" /> folder ID into "Folder ID". The folder ID is the `string` after "/folders/" until the "?". For example, the link: https://drive.google.com/drive/folders/1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7?usp=sharing has a folder ID of `1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7`
+
+> <details>
+>  <summary>💡 Engineering Explanation</summary>
+> It is recommended to paste in the correct folder ID, but there are several checks in place to grab a valid ID (as long as you have a valid ID somewhere in the string, it will work).  
+> If you enter an invalid ID (e.g. `123abc`), an error will be thrown and output to the console.
+> </details>
+
 7. At the top right, click Deploy > New Deployment (Web App) and set the access to "Anyone". Copy that link and paste it into "Apps Script Link". 
 
 8. Go back to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" /> File > Share > Publish. Copy that link and paste it into "Read from Link" 
@@ -202,7 +209,7 @@ There is an example setup attached with this repo.
 
 4. Open the Drive Image Sync Editor under Tools > Drive Image Sync. Paste the link into “Apps Script Link”.
 <p align="center">
- <img width="649" height="230" alt="image" src="https://github.com/user-attachments/assets/a8235765-889d-49ed-b92a-ba05570f2f45" />
+ <img width="734" height="137" alt="image" src="https://github.com/user-attachments/assets/b8ca88f4-de7b-4e6d-86ae-97c64ae1dbb1" />
 </p>
 
 5. On the Asset Manager Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />, get the published, downloadable link under File > Share > Publish to Web as a csv. Paste that link into “Read from Link”.
@@ -212,9 +219,11 @@ There is an example setup attached with this repo.
 
 6. Assign the `AssetList.csv` TextAsset to "Target CSV".
 
-7. In Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />, click “Run Apps Script".
+7. Paste this folder ID into Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />: `1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7`
+
+8. In Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />, click “Run Apps Script".
  
-8. Once it’s done, click “Populate Assets”. You will see the download progress.
+9. Once it’s done, click “Populate Assets”. You will see the download progress.
 
 <p align="center">
   <img width="732" height="119" alt="image" src="https://github.com/user-attachments/assets/8987b864-be7d-43a5-98b3-a274cd02a893" />
@@ -224,8 +233,12 @@ There is an example setup attached with this repo.
 ### For Artists:
 
 1. You can upload new assets and create new folders in Google Drive <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/051a0bf6-9ecd-45cc-a6fc-4936b69114a8" />. No problem! Try to come up with a good asset name and don’t change it after. Try to not move assets to other folders, or rename folders as well.
-> [!TIP]
-> Engineering explanation: this won’t break the path, it will just create two assets in the Unity project. E.g. you have an asset named “Cat” in Unity. You upload the same .png but renamed it to "Cat-Brown” and still have "Cat" in Drive, the asset will appear in Unity twice with the different names. You can remove the duplicate asset from Unity either by manually removing it, or removing it from Drive. 
+
+> <details>
+>  <summary>💡 Engineering Explanation</summary>
+>
+> This won’t break the path, it will just create two assets in the Unity project. E.g. you have an asset named “Cat” in Unity. You upload the same .png but renamed it to "Cat-Brown” and still have "Cat" in Drive, the asset will appear in Unity twice with the different names. You can remove the duplicate asset from Unity either by manually removing it, or removing it from Drive. 
+> </details>
 
 2. For updating existing assets, replace the existing asset by uploading a file with the exact same name and selecting “Replace existing file”.
 > [!WARNING]
