@@ -23,6 +23,7 @@ public class ImageSyncWindow : EditorWindow
     private SerializedObject so;
     
     //URLS/needs for Apps Script
+    [SerializeField]private string folderId;
     [SerializeField] private string appsScriptURL = "";
     [SerializeField] private string sourceCSV = "";
     private string targetCsvPath = "";
@@ -40,6 +41,9 @@ public class ImageSyncWindow : EditorWindow
     private int totalAssets = 0;
     private int currentAssetIndex = 0;
     private Vector2 scollPosition;
+    private bool isDownloading = false;
+    private bool shouldStopDownload = false;
+    private List<EditorCoroutine> activeCoroutines = new List<EditorCoroutine>();
     
     //Preview: CSV contents 
     private Vector2 csvScrollPosition;
@@ -47,6 +51,9 @@ public class ImageSyncWindow : EditorWindow
     List<Line_Asset> csvLines = new List<Line_Asset>();
     private Dictionary<string, float> downloadProgress = new Dictionary<string, float>();
     private HashSet<string> currentlyDownloading = new HashSet<string>();
+    
+    //For Sprite setting selection
+    private FilterMode filterMode = FilterMode.Point;
     
     [MenuItem("Tools/Drive Image Sync")]
     public static void ShowWindow() => GetWindow<ImageSyncWindow>("Drive Image Sync");
@@ -62,8 +69,14 @@ public class ImageSyncWindow : EditorWindow
         
         // ---------- For Running the Apps Script and getting the most up-to-date CSV! ----------
         //get the Wep App URL (apps script URL) and the source CSV (the published Google Sheet)
-        EditorGUILayout.PropertyField(so.FindProperty("appsScriptURL"), new GUIContent("Apps Script Link:"));
-        EditorGUILayout.PropertyField(so.FindProperty("sourceCSV"), new GUIContent("Read from Link:"));
+        // Create a GUIContent with a tooltip
+        
+        EditorGUILayout.PropertyField(
+            so.FindProperty("folderId"),
+            new GUIContent("Folder ID", "Copy the folder ID from Google Drive. The folder ID is the string of numbers and letters after /folders/ and ending with a ? (not inclusive of the leading / or ?. Example folder ID: 1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7.")
+        );
+        EditorGUILayout.PropertyField(so.FindProperty("appsScriptURL"), new GUIContent("Apps Script Link"));
+        EditorGUILayout.PropertyField(so.FindProperty("sourceCSV"), new GUIContent("Read from Link"));
         EditorGUILayout.PropertyField(so.FindProperty("targetCSV"), new GUIContent("Target CSV"));
     
         so.ApplyModifiedProperties();
@@ -82,21 +95,27 @@ public class ImageSyncWindow : EditorWindow
         GUILayout.Space(25);
         DrawPreviewSection();
         PopulateAssets();
+        GUILayout.Space(25);
         
+        // ---------- Selecting settings ---------- 
+        //WIP feature!
+        GUILayout.Label("Select Filter Mode", EditorStyles.boldLabel);
+        filterMode = (FilterMode)EditorGUILayout.EnumPopup("Filter Mode", filterMode);
+
         EditorGUILayout.EndScrollView();
     }
     
     // ---------- MAIN FLOW FUNCTIONS ----------
     private void SyncSheet()
     {
-        if (!string.IsNullOrEmpty(appsScriptURL) && !string.IsNullOrEmpty(sourceCSV) && !string.IsNullOrEmpty(targetCsvPath))
+        if (!string.IsNullOrEmpty(folderId) && !string.IsNullOrEmpty(appsScriptURL) && !string.IsNullOrEmpty(sourceCSV) && !string.IsNullOrEmpty(targetCsvPath))
         {
             if (GUILayout.Button("Run Apps Script"))
                 RunAppsScriptWrapper();
         }
         //show error message and don't let user run the Apps Script if they are missing a deploy link, source CSV or target csv
         else
-            EditorGUILayout.HelpBox("Assign an Apps Script web app link, source CSV link and target CSV.", MessageType.Warning);
+            EditorGUILayout.HelpBox("Assign an Apps Script web app link, folder ID, source CSV link and target CSV.", MessageType.Warning);
     }
     
     private void RunAppsScriptWrapper() => EditorCoroutineUtility.StartCoroutineOwnerless(RunAppsScript(appsScriptURL, msg => statusMessage = msg));
@@ -140,6 +159,43 @@ public class ImageSyncWindow : EditorWindow
                 Debug.LogError($"Error populating assets: {e.Message}");
             }
         }
+
+        if (isDownloading)
+        {
+            if (GUILayout.Button("Stop Download"))
+            {
+                StopAllDownloads();
+            }
+        }
+    }
+
+    private void StopAllDownloads()
+    {
+        shouldStopDownload = true;
+        
+        foreach (EditorCoroutine coroutine in activeCoroutines)
+        {
+            if (coroutine != null)
+            {
+                EditorCoroutineUtility.StopCoroutine(coroutine);   
+            }
+        }
+
+        activeCoroutines.Clear();
+        isDownloading = false;
+        currentlyDownloading.Clear();
+        downloadProgress.Clear();
+
+        populateStatusMessage = "Download stopped";
+        currentNamePreview = "Download cancelled";
+        
+        currentAssetIndex = 0;
+        totalAssets = 0;
+        currentTexturePreview = null;
+        currentNamePreview = "";
+
+        Debug.Log("all downloads stopped");
+        Repaint();
     }
 
     private void EvaluateEntries(string[] parsedArray)
@@ -152,37 +208,66 @@ public class ImageSyncWindow : EditorWindow
         );
 
         this.csvLines = lines;
+        
+        activeCoroutines.Clear();
+        shouldStopDownload = false;
 
+        EditorCoroutine downloadCoroutine = EditorCoroutineUtility.StartCoroutineOwnerless(DownloadAllAssets(lines));
+        activeCoroutines.Add(downloadCoroutine);
+        
         currentAssetIndex = 0;
         totalAssets = lines.Count;
         currentTexturePreview = null;
         currentNamePreview = "";
-        
-        EditorCoroutineUtility.StartCoroutineOwnerless(DownloadAllAssets(lines));
     }
 
     private IEnumerator RunAppsScript(string url, Action<string> onStatusUpdate)
     {
         Debug.Log("Running Apps Script");
         onStatusUpdate("Running Apps Script...");
-        //Debug.Log("EXACT URL BEING CALLED: " + url);
+
+        //in case the user inputs some kind of link, not just the ID
+        string cleanedId = AppsScriptUtilities.GetFolderID(folderId);
+    
+        // Only update if it's valid and different
+        if (!string.IsNullOrEmpty(cleanedId) && cleanedId != folderId)
+        {
+            folderId = cleanedId;
+            so.Update();
+            so.FindProperty("folderId").stringValue = folderId;
+            so.ApplyModifiedProperties();
+        }
+    
+        string urlWithParams = url + "?folderId=" + folderId;
         
-        using (UnityWebRequest appsScriptRequest = UnityWebRequest.Get(url))
+        using (UnityWebRequest appsScriptRequest = UnityWebRequest.Get(urlWithParams))
         {
             appsScriptRequest.timeout = 60;
         
             yield return appsScriptRequest.SendWebRequest();
 
             Debug.Log($"Response Code: {appsScriptRequest.responseCode}");
-            //Debug.Log($"Full Response: {appsScriptRequest.downloadHandler.text}");
 
             if (appsScriptRequest.result != UnityWebRequest.Result.Success)
                 Debug.LogError($"Failed to run Apps Script: {appsScriptRequest.error}");
             else
             {
-                //Debug.Log("Apps Script successfully run!");
-                onStatusUpdate("Apps Script successfully run!");
-                SyncWithGoogleSheets();
+                string responseText = appsScriptRequest.downloadHandler.text;
+                Debug.Log($"Full Response: {responseText}");
+            
+                AppsScriptResponse response = JsonUtility.FromJson<AppsScriptResponse>(responseText);
+            
+                //request could succeed but Apps Script might not run correctly, error, e.g. invalid folder ID 
+                if (response.status == "error")
+                {
+                    Debug.LogError($"Apps Script Error: {response.message}");
+                    onStatusUpdate($"Error: {response.message}");
+                }
+                else
+                {
+                    onStatusUpdate("Apps Script successfully run!");
+                    SyncWithGoogleSheets();
+                }
             }
         }
     }
@@ -359,6 +444,7 @@ public class ImageSyncWindow : EditorWindow
     */
     private IEnumerator DownloadAllAssets(List<Line_Asset> lines)
     {
+        isDownloading = true;
         populateStatusMessage = "Populating...";
 
         foreach (Line_Asset line in lines)
@@ -375,13 +461,22 @@ public class ImageSyncWindow : EditorWindow
             );
         }
 
-        yield return CleanUpDeletedAssets(lines);
-        populateStatusMessage = "Populated all assets";
-        
-        // clear preview 
-        yield return new WaitForSeconds(2f);
-        currentTexturePreview = null;
-        currentNamePreview = "All downloads complete!";
+        if (shouldStopDownload == false)
+        {
+            yield return CleanUpDeletedAssets(lines);
+            populateStatusMessage = "Populated all assets";
+            
+            // clear preview 
+            yield return new WaitForSeconds(2f);
+            currentTexturePreview = null;
+            currentNamePreview = "All downloads complete!";
+        }
+        else
+        {
+            populateStatusMessage = "Download stopped";
+            currentNamePreview = "Download cancelled";
+        }
+       
         totalAssets = 0;
         currentAssetIndex = 0;
         Repaint();
@@ -391,6 +486,9 @@ public class ImageSyncWindow : EditorWindow
             "Ready to Populate",
             3f
         ));
+
+        isDownloading = false;
+        shouldStopDownload = false;
     }
     
     //for handling assets that were removed from Drive, but still exist in the Unity project 
@@ -542,7 +640,7 @@ public class ImageSyncWindow : EditorWindow
 
                 importer.alphaIsTransparency = true;
                 importer.mipmapEnabled = false;
-                importer.filterMode = FilterMode.Bilinear;
+                importer.filterMode = FilterMode.Point;
 
                 EditorUtility.SetDirty(importer);
                 importer.SaveAndReimport();

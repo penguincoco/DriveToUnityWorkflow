@@ -8,6 +8,8 @@ using System.Linq;
 
 public static class ParserUtilities
 {
+    public static string[] ParseToArray(string rawText) => rawText.Split('\n');
+    
     //takes in a csvFile path, returns an array that is split along new lines
     public static string[] ParseCSV(string filePath)
     {
@@ -77,11 +79,6 @@ public static class ParserUtilities
             return string.Empty;
     }
 
-    public static string[] ParseToArray(string rawText)
-    {
-        return rawText.Split('\n');
-    }
-
     public static void CreateAsset<T>(T instance, string folderPath, string assetName) where T : ScriptableObject
     {
         if (instance == null)
@@ -109,7 +106,6 @@ public static class ParserUtilities
         AssetDatabase.CreateAsset(instance, uniquePath);
         AssetDatabase.SaveAssets();
     }
-
 
     public static List<T> ParseLines<T>(
         IEnumerable<string> lines,

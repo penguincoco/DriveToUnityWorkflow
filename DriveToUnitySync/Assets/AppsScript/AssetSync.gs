@@ -1,8 +1,17 @@
 // doGet is how Unity can trigger running this script!
 function doGet(e) {
   try {
-    populate();
-    
+     // Check if folderId was provided AND is not empty
+    if (!e.parameter.folderId || e.parameter.folderId.trim() === "") {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "error",
+        message: "Missing required parameter: folderId"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var folderId = e.parameter.folderId;
+    populate(folderId);
+
     // return the success response
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
@@ -16,8 +25,8 @@ function doGet(e) {
   }
 }
 
-function populate() {
-  var files = getAllPngsInFolder("1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7"); //TODO: REPLACE THIS WITH YOUR OWN ROOT FOLDER ID
+function populate(folderId) {
+  var files = getAllPngsInFolder(folderId); // root folder ID
 
   // Sort by folder path, then by filename
   files.sort(function(a, b) {
