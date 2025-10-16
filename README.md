@@ -41,29 +41,38 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
 >
 > ### How this Code works
 >
-> Starting from the root folder (which you will need to copy and paste into files (this line is commented with a `TODO: REPLACE THIS WITH YOUR OWN ROOT FOLDER ID`)), it will check every sub folder and grab all assets of type: `png`, `jpg`, `jpeg`, `psd`, `pdf`, `fbx`, `obj` (technically, it can download any asset of any type, but these are the ones you should generally be uploading, as this is a tool for syncing art assets!). It will then turn each of those assets into a downloadble link and populate that link, along with the asset path, to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />.
+> Starting from the root folder, it will check every sub folder and grab all assets of type: `png`, `jpg`, `jpeg`, `psd`, `pdf`, `fbx`, `obj` (technically, it can download any asset of any type, but these are the ones you should generally be uploading, as this is a tool for syncing art assets!). It will then turn each of those assets into a downloadble link and populate that link, along with the asset path, to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />.
 >
 > ```
 > // doGet is how Unity can trigger running this script!
 > function doGet(e) {
->   try {
->     populate();
->     
->     // return the success response
->     return ContentService.createTextOutput(JSON.stringify({
->       status: "success",
->       message: "Spreadsheet populated successfully"
->     })).setMimeType(ContentService.MimeType.JSON);
->   } catch (error) {
->     return ContentService.createTextOutput(JSON.stringify({
->       status: "error",
->       message: error.toString()
->     })).setMimeType(ContentService.MimeType.JSON);
->   }
+>  try {
+>     // Check if folderId was provided AND is not empty
+>    if (!e.parameter.folderId || e.parameter.folderId.trim() === "") {
+>      return ContentService.createTextOutput(JSON.stringify({
+>        status: "error",
+>        message: "Missing required parameter: folderId"
+>      })).setMimeType(ContentService.MimeType.JSON);
+>    }
+>
+>    var folderId = e.parameter.folderId;
+>    populate(folderId);
+>
+>    // return the success response
+>    return ContentService.createTextOutput(JSON.stringify({
+>      status: "success",
+>      message: "Spreadsheet populated successfully"
+>    })).setMimeType(ContentService.MimeType.JSON);
+>  } catch (error) {
+>    return ContentService.createTextOutput(JSON.stringify({
+>      status: "error",
+>      message: error.toString()
+>    })).setMimeType(ContentService.MimeType.JSON);
+>  }
 > }
 >
-> function populate() {
->   var files = getAllPngsInFolder("1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7"); //TODO: REPLACE THIS WITH YOUR OWN ROOT FOLDER ID
+> function populate(folderId) {
+>   var files = getAllPngsInFolder(folderId)
 >
 >   // Sort by folder path, then by filename
 >   files.sort(function(a, b) {
@@ -141,16 +150,17 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
   <img width="790" height="475" alt="image" src="https://github.com/user-attachments/assets/6a886cb0-4188-4160-b8f8-c2c96b26bdbb" /> <img width="476" height="235" alt="image" src="https://github.com/user-attachments/assets/bc7fad4b-81e2-4d63-b76b-5fec5c834fec" />
 </p>
 
-6. At the top right, click Deploy > New Deployment (Web App) and set the access to "Anyone". Copy that link and paste it into "Apps Script Link". 
+6. Copy and paste your root Google Drive <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/051a0bf6-9ecd-45cc-a6fc-4936b69114a8" /> folder ID into "Folder ID". The folder ID is the `string` after "/folders/" until the "?". For example, the link: https://drive.google.com/drive/folders/1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7?usp=sharing has a folder ID of `1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7`
+7. At the top right, click Deploy > New Deployment (Web App) and set the access to "Anyone". Copy that link and paste it into "Apps Script Link". 
 
-7. Go back to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" /> File > Share > Publish. Copy that link and paste it into "Read from Link" 
+8. Go back to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" /> File > Share > Publish. Copy that link and paste it into "Read from Link" 
 <p align="center">
   <img width="528" height="468" alt="image" src="https://github.com/user-attachments/assets/2820b4e2-4b05-4efa-b179-f3f7cd21a9df" />
 </p>
 
-7. In Unity, create a new .csv (recommended to call it `AssetList.csv`) and drag and drop that into "Target CSV".
+9. In Unity, create a new .csv (recommended to call it `AssetList.csv`) and drag and drop that into "Target CSV".
 
-8. At this point, the "Run Apps Script" button should appear. This button will not be visible unless all 3 fields are filled, and a warning will show. Click "Run Apps Script". This action will:
+10. At this point, the "Run Apps Script" button should appear. This button will not be visible unless all 3 fields are filled, and a warning will show. Click "Run Apps Script". This action will:
 
     a. Run the Apps Script, which searches for all .pngs in the Art folder and all of its subfolders, generate a downloadable link, and then populate that to the AssetManager Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />.
    
@@ -159,7 +169,7 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
  <img width="580" height="384" alt="image" src="https://github.com/user-attachments/assets/bd7aae31-9d59-4764-8518-3e08e867aa44" />
 </p>
 
-9. Once that process is complete (the editor window will show a status that says "Successfully synced!" or "Ready to Sync" (if 3 seconds have passed), click “Populate Assets”. This action will:
+11. Once that process is complete (the editor window will show a status that says "Successfully synced!" or "Ready to Sync" (if 3 seconds have passed), click “Populate Assets”. This action will:
     
     a. Download all .pngs from their downloadable links. The Unity folder structure will mirror the Drive structure under /Assets/Art/__2D. If an asset already exists, it will overwrite the data. If an asset does not already exist, it will create it to the correct folder. (If a folder doesn’t exist, it will also generate the folder)
 
