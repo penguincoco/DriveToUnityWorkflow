@@ -15,7 +15,7 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
 
 1. In Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />, open Drive Image Sync under Tools > Drive Image Sync.
   <p align="center">
-    <img width="656" height="332" alt="image" src="https://github.com/user-attachments/assets/15d82b45-141c-4252-8a56-ae612af7f114" />
+    <img width="729" height="386" alt="image" src="https://github.com/user-attachments/assets/5562c217-c0c4-4ca6-a3de-c124acdd6984" />
   </p>
 
 2. In Google Drive <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/051a0bf6-9ecd-45cc-a6fc-4936b69114a8" />, create a parent folder that you want. Title it whatever you need, having an "Art" parent folder and "2D" and "3D" subfolders is recommended. Upload your assets to their appropriate folders. See example Drive setup [here](<https://drive.google.com/drive/folders/1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7?usp=drive_link>).
@@ -41,29 +41,38 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
 >
 > ### How this Code works
 >
-> Starting from the root folder (which you will need to copy and paste into files (this line is commented with a `TODO: REPLACE THIS WITH YOUR OWN ROOT FOLDER ID`)), it will check every sub folder and grab all assets of type: `png`, `jpg`, `jpeg`, `psd`, `pdf`, `fbx`, `obj` (technically, it can download any asset of any type, but these are the ones you should generally be uploading, as this is a tool for syncing art assets!). It will then turn each of those assets into a downloadble link and populate that link, along with the asset path, to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />.
+> Starting from the root folder, it will check every sub folder and grab all assets of type: `png`, `jpg`, `jpeg`, `psd`, `pdf`, `fbx`, `obj` (technically, it can download any asset of any type, but these are the ones you should generally be uploading, as this is a tool for syncing art assets!). It will then turn each of those assets into a downloadble link and populate that link, along with the asset path, to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />.
 >
 > ```
 > // doGet is how Unity can trigger running this script!
 > function doGet(e) {
->   try {
->     populate();
->     
->     // return the success response
->     return ContentService.createTextOutput(JSON.stringify({
->       status: "success",
->       message: "Spreadsheet populated successfully"
->     })).setMimeType(ContentService.MimeType.JSON);
->   } catch (error) {
->     return ContentService.createTextOutput(JSON.stringify({
->       status: "error",
->       message: error.toString()
->     })).setMimeType(ContentService.MimeType.JSON);
->   }
+>  try {
+>     // Check if folderId was provided AND is not empty
+>    if (!e.parameter.folderId || e.parameter.folderId.trim() === "") {
+>      return ContentService.createTextOutput(JSON.stringify({
+>        status: "error",
+>        message: "Missing required parameter: folderId"
+>      })).setMimeType(ContentService.MimeType.JSON);
+>    }
+>
+>    var folderId = e.parameter.folderId;
+>    populate(folderId);
+>
+>    // return the success response
+>    return ContentService.createTextOutput(JSON.stringify({
+>      status: "success",
+>      message: "Spreadsheet populated successfully"
+>    })).setMimeType(ContentService.MimeType.JSON);
+>  } catch (error) {
+>    return ContentService.createTextOutput(JSON.stringify({
+>      status: "error",
+>      message: error.toString()
+>    })).setMimeType(ContentService.MimeType.JSON);
+>  }
 > }
 >
-> function populate() {
->   var files = getAllPngsInFolder("1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7"); //TODO: REPLACE THIS WITH YOUR OWN ROOT FOLDER ID
+> function populate(folderId) {
+>   var files = getAllPngsInFolder(folderId)
 >
 >   // Sort by folder path, then by filename
 >   files.sort(function(a, b) {
@@ -141,16 +150,24 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
   <img width="790" height="475" alt="image" src="https://github.com/user-attachments/assets/6a886cb0-4188-4160-b8f8-c2c96b26bdbb" /> <img width="476" height="235" alt="image" src="https://github.com/user-attachments/assets/bc7fad4b-81e2-4d63-b76b-5fec5c834fec" />
 </p>
 
-6. At the top right, click Deploy > New Deployment (Web App) and set the access to "Anyone". Copy that link and paste it into "Apps Script Link". 
+6. Copy and paste your root Google Drive <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/051a0bf6-9ecd-45cc-a6fc-4936b69114a8" /> folder ID into "Folder ID". The folder ID is the `string` after "/folders/" until the "?". For example, the link: https://drive.google.com/drive/folders/1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7?usp=sharing has a folder ID of `1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7`
 
-7. Go back to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" /> File > Share > Publish. Copy that link and paste it into "Read from Link" 
+> <details>
+>  <summary>💡 Engineering Explanation</summary>
+> It is recommended to paste in the correct folder ID, but there are several checks in place to grab a valid ID (as long as you have a valid ID somewhere in the string, it will work).  
+> If you enter an invalid ID (e.g. `123abc`), an error will be thrown and output to the console.
+> </details>
+
+7. At the top right, click Deploy > New Deployment (Web App) and set the access to "Anyone". Copy that link and paste it into "Apps Script Link". 
+
+8. Go back to the Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" /> File > Share > Publish. Copy that link and paste it into "Read from Link" 
 <p align="center">
   <img width="528" height="468" alt="image" src="https://github.com/user-attachments/assets/2820b4e2-4b05-4efa-b179-f3f7cd21a9df" />
 </p>
 
-7. In Unity, create a new .csv (recommended to call it `AssetList.csv`) and drag and drop that into "Target CSV".
+9. In Unity, create a new .csv (recommended to call it `AssetList.csv`) and drag and drop that into "Target CSV".
 
-8. At this point, the "Run Apps Script" button should appear. This button will not be visible unless all 3 fields are filled, and a warning will show. Click "Run Apps Script". This action will:
+10. At this point, the "Run Apps Script" button should appear. This button will not be visible unless all 3 fields are filled, and a warning will show. Click "Run Apps Script". This action will:
 
     a. Run the Apps Script, which searches for all .pngs in the Art folder and all of its subfolders, generate a downloadable link, and then populate that to the AssetManager Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />.
    
@@ -159,7 +176,7 @@ This workflow is best run in bulk, once every week or every two weeks, as some o
  <img width="580" height="384" alt="image" src="https://github.com/user-attachments/assets/bd7aae31-9d59-4764-8518-3e08e867aa44" />
 </p>
 
-9. Once that process is complete (the editor window will show a status that says "Successfully synced!" or "Ready to Sync" (if 3 seconds have passed), click “Populate Assets”. This action will:
+11. Once that process is complete (the editor window will show a status that says "Successfully synced!" or "Ready to Sync" (if 3 seconds have passed), click “Populate Assets”. This action will:
     
     a. Download all .pngs from their downloadable links. The Unity folder structure will mirror the Drive structure under /Assets/Art/__2D. If an asset already exists, it will overwrite the data. If an asset does not already exist, it will create it to the correct folder. (If a folder doesn’t exist, it will also generate the folder)
 
@@ -192,7 +209,7 @@ There is an example setup attached with this repo.
 
 4. Open the Drive Image Sync Editor under Tools > Drive Image Sync. Paste the link into “Apps Script Link”.
 <p align="center">
- <img width="649" height="230" alt="image" src="https://github.com/user-attachments/assets/a8235765-889d-49ed-b92a-ba05570f2f45" />
+ <img width="734" height="137" alt="image" src="https://github.com/user-attachments/assets/b8ca88f4-de7b-4e6d-86ae-97c64ae1dbb1" />
 </p>
 
 5. On the Asset Manager Google Sheet <img width="12" height="16" alt="image" src="https://github.com/user-attachments/assets/bf7b2a0e-5735-4acf-b49b-4c3c9a840062" />, get the published, downloadable link under File > Share > Publish to Web as a csv. Paste that link into “Read from Link”.
@@ -202,9 +219,11 @@ There is an example setup attached with this repo.
 
 6. Assign the `AssetList.csv` TextAsset to "Target CSV".
 
-7. In Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />, click “Run Apps Script".
+7. Paste this folder ID into Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />: `1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7`
+
+8. In Unity <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/d1686289-6d84-4e03-ae1f-eb69a18ee406" />, click “Run Apps Script".
  
-8. Once it’s done, click “Populate Assets”. You will see the download progress.
+9. Once it’s done, click “Populate Assets”. You will see the download progress.
 
 <p align="center">
   <img width="732" height="119" alt="image" src="https://github.com/user-attachments/assets/8987b864-be7d-43a5-98b3-a274cd02a893" />
@@ -214,8 +233,12 @@ There is an example setup attached with this repo.
 ### For Artists:
 
 1. You can upload new assets and create new folders in Google Drive <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/051a0bf6-9ecd-45cc-a6fc-4936b69114a8" />. No problem! Try to come up with a good asset name and don’t change it after. Try to not move assets to other folders, or rename folders as well.
-> [!TIP]
-> Engineering explanation: this won’t break the path, it will just create two assets in the Unity project. E.g. you have an asset named “Cat” in Unity. You upload the same .png but renamed it to "Cat-Brown” and still have "Cat" in Drive, the asset will appear in Unity twice with the different names. You can remove the duplicate asset from Unity either by manually removing it, or removing it from Drive. 
+
+> <details>
+>  <summary>💡 Engineering Explanation</summary>
+>
+> This won’t break the path, it will just create two assets in the Unity project. E.g. you have an asset named “Cat” in Unity. You upload the same .png but renamed it to "Cat-Brown” and still have "Cat" in Drive, the asset will appear in Unity twice with the different names. You can remove the duplicate asset from Unity either by manually removing it, or removing it from Drive. 
+> </details>
 
 2. For updating existing assets, replace the existing asset by uploading a file with the exact same name and selecting “Replace existing file”.
 > [!WARNING]
