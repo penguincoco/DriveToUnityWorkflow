@@ -60,18 +60,25 @@ public class ImageSyncWindow : EditorWindow
     //For Sprite setting selection
     [SerializeField] private FilterMode filterMode = FilterMode.Point;
     [SerializeField] private TextureImporterType textureType = TextureImporterType.Default;
-    [SerializeField] private  int pixelsPerUnit = 100;
+    [SerializeField] private int pixelsPerUnit = 100;
+    [SerializeField] private TextureImporterCompression compressionType = TextureImporterCompression.Uncompressed;
+    [SerializeField] private SpriteImportMode spriteImportMode = SpriteImportMode.Single;
+    [SerializeField] private bool alphaIsTransparency = true;
     
     private SerializedProperty propPixelsPerUnit;
     private SerializedProperty propFilterMode;
     private SerializedProperty propTextureType;
+    private SerializedProperty propCompressionType;
+    private SerializedProperty propSpriteImportMode;
+    private SerializedProperty propAlphaIsTransparency;
     private bool showSpriteSettingEditor = false;
     
     [MenuItem("Tools/Drive Image Sync")]
     public static void ShowWindow() => GetWindow<ImageSyncWindow>("Drive Image Sync");
+    private void OnEnable() => SerializeProperties();
 
-    private void OnEnable()
-    { 
+    private void SerializeProperties()
+    {
         so = new SerializedObject(this);
         propFolderId = so.FindProperty("folderId");
         propAppsScriptURL = so.FindProperty("appsScriptURL");
@@ -81,15 +88,17 @@ public class ImageSyncWindow : EditorWindow
         propPixelsPerUnit = so.FindProperty("pixelsPerUnit");
         propFilterMode = so.FindProperty("filterMode");
         propTextureType = so.FindProperty("textureType");
-    } 
+        propCompressionType = so.FindProperty("compressionType");
+        propSpriteImportMode = so.FindProperty("spriteImportMode");
+        propAlphaIsTransparency = so.FindProperty("alphaIsTransparency");
+    }
 
     void OnGUI()
     {
+        so.Update();
+        
         GUILayout.Label("Drive Image Sync", EditorStyles.boldLabel);
         scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.Width(position.width), GUILayout.Height(position.height - 20));
-        
-        // ---------- Serialization overhead ----------
-        so.Update();
         
         // ---------- For Running the Apps Script and getting the most up-to-date CSV! ----------
         //get the Wep App URL (apps script URL) and the source CSV (the published Google Sheet)
@@ -120,8 +129,9 @@ public class ImageSyncWindow : EditorWindow
         // ---------- Selecting settings ---------- 
         //WIP feature!
         DrawLine();
-        GUILayout.Label("Everything below this line is temp/WIP feature!", EditorStyles.boldLabel);
+        //GUILayout.Label("Everything below this line is temp/WIP feature!", EditorStyles.boldLabel);
         GUILayout.Label("Sprite Settings", EditorStyles.boldLabel);
+        GUILayout.Label("These are the sprite settings new sprites will download with/existing Sprites will overwrite with.");
         ShowSpriteSettings();
 
         so.ApplyModifiedProperties();
@@ -130,22 +140,30 @@ public class ImageSyncWindow : EditorWindow
 
     private void ShowSpriteSettings()
     {
-        GUILayout.Label($"Current filter mode is {filterMode}");
+        GUILayout.Label($"Current Texture Type is: {textureType}");
+        GUILayout.Label($"Current Pixels Per Unit is: {pixelsPerUnit}");
+        GUILayout.Label($"Current Filter Mode is: {filterMode}");
+        GUILayout.Label($"Current Compression Type is: {compressionType}");
+        GUILayout.Label($"Current Sprite Import Mode is: {spriteImportMode}");
        
         showSpriteSettingEditor = EditorGUILayout.Foldout(showSpriteSettingEditor,  "Change Sprite Settings", true);
 
         if (showSpriteSettingEditor)
         {
+            //background box
             GUIStyle boxStyle = new GUIStyle(GUI.skin.box);
             boxStyle.padding = new RectOffset(10, 10, 5, 5);
 
             GUILayout.BeginVertical(boxStyle);
             
-            //sprite settings
-            EditorGUILayout.PropertyField(propFilterMode);
+            // ---------- sprite settings ----------
             EditorGUILayout.PropertyField(propTextureType);
             EditorGUILayout.PropertyField(propPixelsPerUnit);
             propPixelsPerUnit.intValue = propPixelsPerUnit.intValue.AtLeast(1).AtMost(100);
+            EditorGUILayout.PropertyField(propFilterMode);
+            EditorGUILayout.PropertyField(propCompressionType);
+            EditorGUILayout.PropertyField(propSpriteImportMode);
+            // ---------- end ----------
 
             GUILayout.EndVertical();
         }
@@ -691,14 +709,12 @@ public class ImageSyncWindow : EditorWindow
             TextureImporter importer = AssetImporter.GetAtPath(savePath) as TextureImporter;
             if (importer != null)
             {
-                importer.textureType = TextureImporterType.Sprite;
-                importer.spriteImportMode =
-                    SpriteImportMode
-                        .Single; //potential TODO: make it multiple? or is it possible to determine if it's a spritesheet? maybe a naming convention... hmmm....
-                importer.spritePixelsPerUnit = pixelsPerUnit;
-                importer.alphaIsTransparency = true;
-                importer.mipmapEnabled = false;
+                importer.textureType = this.textureType;
+                importer.spriteImportMode = this.spriteImportMode;  //potential TODO: maybe make this dynamic based off of a naming convention? it's hard to set a standard for all sprites...
+                importer.spritePixelsPerUnit = this.pixelsPerUnit;
+                importer.alphaIsTransparency = this.alphaIsTransparency;
                 importer.filterMode = this.filterMode;
+                importer.textureCompression = this.compressionType;
 
                 EditorUtility.SetDirty(importer);
                 importer.SaveAndReimport();
