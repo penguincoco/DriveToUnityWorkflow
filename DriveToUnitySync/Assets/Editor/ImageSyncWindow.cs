@@ -23,11 +23,16 @@ public class ImageSyncWindow : EditorWindow
     private SerializedObject so;
     
     //URLS/needs for Apps Script
-    [SerializeField]private string folderId;
+    [SerializeField] private string folderId;
     [SerializeField] private string appsScriptURL = "";
     [SerializeField] private string sourceCSV = "";
-    private string targetCsvPath = "";
+    private string targetCsvPath = "";  //this is the csv in the Unity project that will be mirrored from Google Sheets!
     [SerializeField] private TextAsset targetCSV;
+
+    private SerializedProperty propFolderId;
+    private SerializedProperty propAppsScriptURL;
+    private SerializedProperty propSourceCSV;
+    private SerializedProperty propTargetCSV;
 
     //status messages
     private string statusMessage = "";
@@ -53,15 +58,34 @@ public class ImageSyncWindow : EditorWindow
     private HashSet<string> currentlyDownloading = new HashSet<string>();
     
     //For Sprite setting selection
-    private FilterMode filterMode = FilterMode.Point;
+    [SerializeField] private FilterMode filterMode = FilterMode.Point;
+    [SerializeField] private TextureImporterType textureType = TextureImporterType.Default;
+    [SerializeField] private  int pixelsPerUnit = 100;
+    
+    private SerializedProperty propPixelsPerUnit;
+    private SerializedProperty propFilterMode;
+    private SerializedProperty propTextureType;
+    private bool showSpriteSettingEditor = false;
     
     [MenuItem("Tools/Drive Image Sync")]
     public static void ShowWindow() => GetWindow<ImageSyncWindow>("Drive Image Sync");
-    private void OnEnable() => so = new SerializedObject(this);
+
+    private void OnEnable()
+    { 
+        so = new SerializedObject(this);
+        propFolderId = so.FindProperty("folderId");
+        propAppsScriptURL = so.FindProperty("appsScriptURL");
+        propSourceCSV = so.FindProperty("sourceCSV");
+        propTargetCSV = so.FindProperty("targetCSV");
+        
+        propPixelsPerUnit = so.FindProperty("pixelsPerUnit");
+        propFilterMode = so.FindProperty("filterMode");
+        propTextureType = so.FindProperty("textureType");
+    } 
 
     void OnGUI()
     {
-        GUILayout.Label("Drive Image Sync");
+        GUILayout.Label("Drive Image Sync", EditorStyles.boldLabel);
         scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.Width(position.width), GUILayout.Height(position.height - 20));
         
         // ---------- Serialization overhead ----------
@@ -69,17 +93,13 @@ public class ImageSyncWindow : EditorWindow
         
         // ---------- For Running the Apps Script and getting the most up-to-date CSV! ----------
         //get the Wep App URL (apps script URL) and the source CSV (the published Google Sheet)
-        // Create a GUIContent with a tooltip
-        
         EditorGUILayout.PropertyField(
-            so.FindProperty("folderId"),
+            propFolderId,
             new GUIContent("Folder ID", "Copy the folder ID from Google Drive. The folder ID is the string of numbers and letters after /folders/ and ending with a ? (not inclusive of the leading / or ?. Example folder ID: 1pKIJrvFdqV3zNfmC8rYZzgt6yGeWsrE7.")
         );
-        EditorGUILayout.PropertyField(so.FindProperty("appsScriptURL"), new GUIContent("Apps Script Link"));
-        EditorGUILayout.PropertyField(so.FindProperty("sourceCSV"), new GUIContent("Read from Link"));
-        EditorGUILayout.PropertyField(so.FindProperty("targetCSV"), new GUIContent("Target CSV"));
-    
-        so.ApplyModifiedProperties();
+        EditorGUILayout.PropertyField(propAppsScriptURL, new GUIContent("Apps Script Link"));
+        EditorGUILayout.PropertyField(propSourceCSV, new GUIContent("Read from Link"));
+        EditorGUILayout.PropertyField(propTargetCSV, new GUIContent("Target CSV"));
     
         targetCsvPath = AssetDatabase.GetAssetPath(targetCSV);
         // ---------- end ----------
@@ -99,10 +119,47 @@ public class ImageSyncWindow : EditorWindow
         
         // ---------- Selecting settings ---------- 
         //WIP feature!
-        GUILayout.Label("Select Filter Mode", EditorStyles.boldLabel);
-        filterMode = (FilterMode)EditorGUILayout.EnumPopup("Filter Mode", filterMode);
+        DrawLine();
+        GUILayout.Label("Everything below this line is temp/WIP feature!", EditorStyles.boldLabel);
+        GUILayout.Label("Sprite Settings", EditorStyles.boldLabel);
+        ShowSpriteSettings();
 
+        so.ApplyModifiedProperties();
         EditorGUILayout.EndScrollView();
+    }
+
+    private void ShowSpriteSettings()
+    {
+        GUILayout.Label($"Current filter mode is {filterMode}");
+       
+        showSpriteSettingEditor = EditorGUILayout.Foldout(showSpriteSettingEditor,  "Change Sprite Settings", true);
+
+        if (showSpriteSettingEditor)
+        {
+            GUIStyle boxStyle = new GUIStyle(GUI.skin.box);
+            boxStyle.padding = new RectOffset(10, 10, 5, 5);
+
+            GUILayout.BeginVertical(boxStyle);
+            
+            //sprite settings
+            EditorGUILayout.PropertyField(propFilterMode);
+            EditorGUILayout.PropertyField(propTextureType);
+            EditorGUILayout.PropertyField(propPixelsPerUnit);
+            propPixelsPerUnit.intValue = propPixelsPerUnit.intValue.AtLeast(1).AtMost(100);
+
+            GUILayout.EndVertical();
+        }
+    }
+
+    private void DrawLine()
+    {
+        Rect r = EditorGUILayout.GetControlRect(GUILayout.Height(1 + 10));
+        r.height = 1;
+        r.y += 5;
+        r.x -= 2; 
+        r.width += 6; 
+        
+        EditorGUI.DrawRect(r, Color.grey);
     }
     
     // ---------- MAIN FLOW FUNCTIONS ----------
@@ -435,11 +492,11 @@ public class ImageSyncWindow : EditorWindow
         catch (Exception e)
         {
             csvLines.Clear();
-            // Debug.LogError($"Error loading CSV data: {e.Message}");
+            Debug.LogError($"Error loading CSV data: {e.Message}");
         }
     }
 
-    /*zHelper function: This downloads all assets from the CSV, there's an individual DownloadAndSave function that actually
+    /*Helper function: This downloads all assets from the CSV, there's an individual DownloadAndSave function that actually
     * does the download for each asset
     */
     private IEnumerator DownloadAllAssets(List<Line_Asset> lines)
@@ -560,13 +617,14 @@ public class ImageSyncWindow : EditorWindow
 
         string extension = Path.GetExtension(fileName).ToLower();
         bool isImage = extension == ".png" || extension == ".jpg" || extension == ".jpeg";
-
-        UnityWebRequest uwr;
+        UnityWebRequest uwr = isImage ? UnityWebRequestTexture.GetTexture(sourcePath) : UnityWebRequest.Get(sourcePath);
+        
+        /*
         if (isImage)
             uwr = UnityWebRequestTexture.GetTexture(sourcePath);
         else
             uwr = UnityWebRequest.Get(sourcePath);
-    
+        */
         using (uwr)
         {
             UnityWebRequestAsyncOperation operation = uwr.SendWebRequest();
@@ -637,10 +695,10 @@ public class ImageSyncWindow : EditorWindow
                 importer.spriteImportMode =
                     SpriteImportMode
                         .Single; //potential TODO: make it multiple? or is it possible to determine if it's a spritesheet? maybe a naming convention... hmmm....
-
+                importer.spritePixelsPerUnit = pixelsPerUnit;
                 importer.alphaIsTransparency = true;
                 importer.mipmapEnabled = false;
-                importer.filterMode = FilterMode.Point;
+                importer.filterMode = this.filterMode;
 
                 EditorUtility.SetDirty(importer);
                 importer.SaveAndReimport();
