@@ -43,7 +43,7 @@ public static class AppsScriptUtilities
     
         if (IsValidFolderId(extractedId))
         {
-            Debug.Log($"Extracted valid ID: {extractedId}");
+            //Debug.Log($"Extracted valid ID: {extractedId}");
             return extractedId;
         }
         else
@@ -53,9 +53,7 @@ public static class AppsScriptUtilities
         }
     }
 
-    /*
-     * validate the ID: needs to have enough characters, and must be alpha numeric values
-     */
+    //validate the ID: needs to have enough characters, and must be alpha numeric values
     private static bool IsValidFolderId(string id)
     {
         if (string.IsNullOrEmpty(id))
