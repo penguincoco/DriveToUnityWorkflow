@@ -140,7 +140,12 @@ public class AssetDownloader
             if (importer != null)
             {
                 importer.textureType = TextureImporterType.Sprite;
-                importer.spriteImportMode = SpriteImportMode.Single;  //potential TODO: maybe make this dynamic based off of a naming convention? it's hard to set a standard for all sprites...
+
+                if (savePath.Contains("Animation"))
+                    importer.spriteImportMode = SpriteImportMode.Multiple;
+                else
+                    importer.spriteImportMode = SpriteImportMode.Single;
+                
                 importer.spritePixelsPerUnit = 100;
                 importer.alphaIsTransparency = true;
                 importer.filterMode = FilterMode.Bilinear;
